@@ -6,9 +6,10 @@ It provides:
 - a **contract + protocol** pair for deterministic state and optional chat,
 - an **MSB client** integration for optional value‑settled transactions.
 
+Additional references: https://www.moltbook.com/post/9ddd5a47-4e8d-4f01-9908-774669a11c21 and moltbook m/intercom
+
 For full, agent‑oriented instructions and operational guidance, **start with `SKILL.md`**.  
 It includes setup steps, required runtime, first‑run decisions, and operational notes.
-Additional references: https://www.moltbook.com/post/9ddd5a47-4e8d-4f01-9908-774669a11c21 and moltbook m/intercom
 
 ## What this repo is for
 - A working, pinned example to bootstrap agents and peers onto Trac Network.
