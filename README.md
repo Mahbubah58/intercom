@@ -27,8 +27,7 @@ TracScope connects to an IntercomSwap contract network as a **passive observer p
 
 ## Screenshots
 
-![TracScope Dashboard](Screenshot_20260224-213029.png)
-![TracScope Live Feed](Screenshot_20260224-213038.png)
+![TracScope Dashboard](20260225_005226.png)
 > *(Run `pear run . store1` then open [http://localhost:7842](http://localhost:7842) — screenshot your dashboard here for the competition submission)*
 
 ---
