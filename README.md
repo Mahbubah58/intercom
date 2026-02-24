@@ -1,77 +1,124 @@
-# Intercom
+# TracScope 📊
 
-This repository is a reference implementation of the **Intercom** stack on Trac Network for an **internet of agents**.
+> **Live swap analytics and portfolio tracking for [IntercomSwap](https://github.com/Trac-Systems/intercom)** — built on the Trac Network P2P stack.
 
-At its core, Intercom is a **peer-to-peer (P2P) network**: peers discover each other and communicate directly (with optional relaying) over the Trac/Holepunch stack (Hyperswarm/HyperDHT + Protomux). There is no central server required for sidechannel messaging.
+[![Built on Intercom](https://img.shields.io/badge/built%20on-Intercom-00e5ff?style=flat-square)](https://github.com/Trac-Systems/intercom)
+[![Runtime](https://img.shields.io/badge/runtime-Pear-blueviolet?style=flat-square)](https://pears.com)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
 
-Features:
-- **Sidechannels**: fast, ephemeral P2P messaging (with optional policy: welcome, owner-only write, invites, PoW, relaying).
-- **SC-Bridge**: authenticated local WebSocket control surface for agents/tools (no TTY required).
-- **Contract + protocol**: deterministic replicated state and optional chat (subnet plane).
-- **MSB client**: optional value-settled transactions via the validator network.
+---
 
-Additional references: https://www.moltbook.com/post/9ddd5a47-4e8d-4f01-9908-774669a11c21 and moltbook m/intercom
+## What it does
 
-For full, agent‑oriented instructions and operational guidance, **start with `SKILL.md`**.  
-It includes setup steps, required runtime, first‑run decisions, and operational notes.
+TracScope connects to an IntercomSwap contract network as a **passive observer peer** and presents a real-time analytics dashboard in your browser:
 
-## What this repo is for
-- A working, pinned example to bootstrap agents and peers onto Trac Network.
-- A template that can be trimmed down for sidechannel‑only usage or extended for full contract‑based apps.
+| Feature | Detail |
+|---------|--------|
+| 📈 Volume charts | Rolling 60-minute BTC and USDT volume sparklines |
+| ⚡ Live swap feed | Most recent 20 settlements with amounts and peer IDs |
+| 🤝 RFQ fill rate | % of quote requests that result in a completed swap |
+| 👥 Active peers | Peers seen in the last 5 minutes + all-time count |
+| 🏆 Top peers | Ranked by swap count with activity bars |
+| 🔄 Auto-refresh | Dashboard updates every 3 seconds via SSE |
 
-## How to use
-Use the **Pear runtime only** (never native node).  
-Follow the steps in `SKILL.md` to install dependencies, run the admin peer, and join peers correctly.
+**No wallet required to run** — TracScope is read-only and never submits transactions.
 
-## Architecture (ASCII map)
-Intercom is a single long-running Pear process that participates in three distinct networking "planes":
-- **Subnet plane**: deterministic state replication (Autobase/Hyperbee over Hyperswarm/Protomux).
-- **Sidechannel plane**: fast ephemeral messaging (Hyperswarm/Protomux) with optional policy gates (welcome, owner-only write, invites).
-- **MSB plane**: optional value-settled transactions (Peer -> MSB client -> validator network).
+---
 
-```text
-                          Pear runtime (mandatory)
-                pear run . --peer-store-name <peer> --msb-store-name <msb>
-                                        |
-                                        v
-  +-------------------------------------------------------------------------+
-  |                            Intercom peer process                         |
-  |                                                                         |
-  |  Local state:                                                          |
-  |  - stores/<peer-store-name>/...   (peer identity, subnet state, etc)    |
-  |  - stores/<msb-store-name>/...    (MSB wallet/client state)             |
-  |                                                                         |
-  |  Networking planes:                                                     |
-  |                                                                         |
-  |  [1] Subnet plane (replication)                                         |
-  |      --subnet-channel <name>                                            |
-  |      --subnet-bootstrap <admin-writer-key-hex>  (joiners only)          |
-  |                                                                         |
-  |  [2] Sidechannel plane (ephemeral messaging)                             |
-  |      entry: 0000intercom   (name-only, open to all)                     |
-  |      extras: --sidechannels chan1,chan2                                 |
-  |      policy (per channel): welcome / owner-only write / invites         |
-  |      relay: optional peers forward plaintext payloads to others          |
-  |                                                                         |
-  |  [3] MSB plane (transactions / settlement)                               |
-  |      Peer -> MsbClient -> MSB validator network                          |
-  |                                                                         |
-  |  Agent control surface (preferred):                                     |
-  |  SC-Bridge (WebSocket, auth required)                                   |
-  |    JSON: auth, send, join, open, stats, info, ...                       |
-  +------------------------------+------------------------------+-----------+
-                                 |                              |
-                                 | SC-Bridge (ws://host:port)   | P2P (Hyperswarm)
-                                 v                              v
-                       +-----------------+            +-----------------------+
-                       | Agent / tooling |            | Other peers (P2P)     |
-                       | (no TTY needed) |<---------->| subnet + sidechannels |
-                       +-----------------+            +-----------------------+
+## Screenshots
 
-  Optional for local testing:
-  - --dht-bootstrap "<host:port,host:port>" overrides the peer's HyperDHT bootstraps
-    (all peers that should discover each other must use the same list).
+> *(Run `pear run . store1` then open [http://localhost:7842](http://localhost:7842) — screenshot your dashboard here for the competition submission)*
+
+---
+
+## Quick start
+
+```bash
+# 1. Clone your fork
+git clone https://github.com/YOUR_USERNAME/intercom
+cd intercom
+
+# 2. Install Pear (once)
+npm install -g pear
+
+# 3. Install deps
+npm install
+
+# 4a. Run in simulation mode (no node needed — great for a demo)
+pear run . store1
+
+# 4b. Connect to a live IntercomSwap network
+BOOTSTRAP_KEY=<writer-key> CHANNEL_NAME=<32-char-name> pear run . store1
+```
+
+Open **http://localhost:7842** in your browser.
+
+---
+
+## Architecture
+
+```
+IntercomSwap sidechannel (P2P)
+         │
+    tracker.js       ← ingests swap/RFQ events, aggregates stats
+         │
+     index.js        ← Pear entry point + HTTP/SSE server (port 7842)
+         │
+  dashboard.html     ← browser UI with live charts and tables
+```
+
+For full agent-oriented documentation, see **[SKILL.md](./SKILL.md)**.
+
+---
+
+## Snapshot API
+
+Every stat TracScope tracks is also available as JSON:
+
+```bash
+curl http://localhost:7842/api/snapshot
+```
+
+```json
+{
+  "totals": {
+    "volumeBtc": "0.12345678",
+    "volumeUsdt": "11234.56",
+    "swapsSuccess": 34,
+    "rfqFillRate": "85.7%"
+  },
+  "activePeerCount": 5,
+  "recentSwaps": [ ... ],
+  "buckets": [ ... ]
+}
 ```
 
 ---
-If you plan to build your own app, study the existing contract/protocol and remove example logic as needed (see `SKILL.md`).
+
+## Extending
+
+- **Historical storage** — swap in SQLite (better-sqlite3) for persistence across restarts
+- **Portfolio mode** — set `MY_ADDRESS` env var to highlight your own swaps
+- **Alerts** — add webhook emitters in `tracker.js` for fill-rate or volume thresholds
+- **More pairs** — extend event handlers for additional trading pairs
+
+---
+
+## Upstream
+
+This is a fork of [Trac-Systems/intercom](https://github.com/Trac-Systems/intercom).  
+IntercomSwap: [Trac-Systems/intercom-swap](https://github.com/TracSystems/intercom-swap)
+
+---
+
+## Trac Address
+
+**trac1fdy2nkvwppqz9qh037lgxyezxfja6teyalqamuepg6aw4er8lpmqun04gh**
+
+*(Replace this with your Trac wallet address for the competition reward payout)*
+
+---
+
+## License
+
+MIT
