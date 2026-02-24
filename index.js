@@ -177,3 +177,4 @@ function startDashboardServer() {
 
   console.log('[TracScope] Ready.')
 })()
+
