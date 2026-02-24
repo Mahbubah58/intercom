@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TracScope – Swap Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #080c10;
+    --surface:  #0d1117;
+    --card:     #111820;
+    --border:   #1e2a38;
+    --accent:   #00e5ff;
+    --green:    #00ff88;
+    --orange:   #ff9500;
+    --red:      #ff4566;
+    --text:     #cdd9e5;
+    --muted:    #4a5c70;
+    --glow:     rgba(0,229,255,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── Grid background ─── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 24px 24px 80px; }
+
+  /* ─── Header ─── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0 28px; border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+  .logo { display: flex; align-items: center; gap: 14px; }
+  .logo-mark {
+    width: 40px; height: 40px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #0066ff);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px;
+    color: #000; box-shadow: 0 0 20px var(--glow);
+  }
+  .logo-text { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; color: #fff; }
+  .logo-sub  { font-size: 10px; color: var(--muted); letter-spacing: 0.15em; margin-top: 2px; }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; letter-spacing: 0.1em; color: var(--muted);
+    border: 1px solid var(--border); padding: 6px 14px; border-radius: 20px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s infinite;
+  }
+  .dot.offline { background: var(--red); box-shadow: 0 0 6px var(--red); animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ─── Stat cards ─── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px; position: relative; overflow: hidden; transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: rgba(0,229,255,0.3); }
+  .stat-card::after {
+    content: ''; position: absolute; inset: 0; border-radius: 10px;
+    background: radial-gradient(circle at top left, var(--glow), transparent 60%);
+    pointer-events: none;
+  }
+  .stat-label { font-size: 10px; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: #fff; line-height: 1; }
+  .stat-value.green  { color: var(--green); }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.orange { color: var(--orange); }
+  .stat-sub { font-size: 10px; color: var(--muted); margin-top: 6px; }
+
+  /* ─── Two-col layout ─── */
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 800px) { .row { grid-template-columns: 1fr; } }
+
+  /* ─── Panel ─── */
+  .panel {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 20px;
+  }
+  .panel-title {
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .panel-title span { color: var(--accent); font-size: 12px; }
+
+  /* ─── Chart (canvas sparkline) ─── */
+  canvas { width: 100%; height: 120px; display: block; }
+
+  /* ─── Table ─── */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .data-table th {
+    text-align: left; color: var(--muted); font-weight: 400; letter-spacing: 0.1em;
+    padding: 0 8px 10px; border-bottom: 1px solid var(--border);
+  }
+  .data-table td { padding: 10px 8px; border-bottom: 1px solid rgba(30,42,56,0.5); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: rgba(0,229,255,0.03); }
+
+  .peer-id { color: var(--accent); font-size: 10px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px;
+    letter-spacing: 0.1em; font-weight: 700;
+  }
+  .badge.success { background: rgba(0,255,136,0.15); color: var(--green); }
+  .badge.refund  { background: rgba(255,69,102,0.15); color: var(--red); }
+  .badge.pending { background: rgba(255,149,0,0.15);  color: var(--orange); }
+
+  /* ─── Fill-rate bar ─── */
+  .fill-bar-wrap { background: var(--border); border-radius: 2px; height: 6px; margin-top: 8px; }
+  .fill-bar { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width 1s ease; }
+
+  /* ─── Peer activity bars ─── */
+  .peer-bar-wrap { background: var(--border); border-radius: 2px; height: 4px; flex: 1; }
+  .peer-bar { height: 100%; border-radius: 2px; background: var(--accent); min-width: 2px; }
+
+  /* ─── Timestamp ─── */
+  .ts { color: var(--muted); font-size: 10px; }
+
+  /* ─── Fade-in ─── */
+  @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+  .stat-card, .panel { animation: fadeUp 0.4s ease both; }
+
+  /* ─── Uptime ─── */
+  #uptime { font-size: 11px; color: var(--muted); }
+
+  .sim-banner {
+    background: rgba(255,149,0,0.1); border: 1px solid rgba(255,149,0,0.3);
+    border-radius: 6px; padding: 10px 16px; font-size: 11px; color: var(--orange);
+    margin-bottom: 20px; letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">
+      <div class="logo-mark">TS</div>
+      <div>
+        <div class="logo-text">TracScope</div>
+        <div class="logo-sub">INTERCOMSWAP ANALYTICS</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div id="uptime">uptime: –</div>
+      <div class="status-pill">
+        <div class="dot" id="statusDot"></div>
+        <span id="statusText">CONNECTING</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="sim-banner" id="simBanner" style="display:none">
+    ⚡ Simulation mode — no BOOTSTRAP_KEY set. Data is synthetic. Set <code>BOOTSTRAP_KEY</code> env var to connect to live Intercom.
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Volume (BTC)</div>
+      <div class="stat-value accent" id="volBtc">0.00000000</div>
+      <div class="stat-sub" id="volUsdt">≈ $0.00 USDT</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Swaps Settled</div>
+      <div class="stat-value green" id="swapsSuccess">0</div>
+      <div class="stat-sub" id="swapsRefund">0 refunded</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">RFQ Fill Rate</div>
+      <div class="stat-value" id="fillRate">0%</div>
+      <div class="fill-bar-wrap"><div class="fill-bar" id="fillBar" style="width:0%"></div></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Peers</div>
+      <div class="stat-value orange" id="activePeers">0</div>
+      <div class="stat-sub" id="totalPeers">0 total seen</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">RFQ Requests</div>
+      <div class="stat-value" id="rfqRequests">0</div>
+      <div class="stat-sub" id="rfqAccepted">0 accepted</div>
+    </div>
+  </div>
+
+  <!-- Charts + peers -->
+  <div class="row">
+    <div class="panel">
+      <div class="panel-title">Swap Volume <span>60-min rolling</span></div>
+      <canvas id="volumeChart"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Swap Count <span>60-min rolling</span></div>
+      <canvas id="swapChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Top peers + recent swaps -->
+  <div class="row">
+    <div class="panel">
+      <div class="panel-title">Top Peers <span>by swaps</span></div>
+      <table class="data-table">
+        <thead><tr>
+          <th>Peer</th>
+          <th>Swaps</th>
+          <th>RFQs</th>
+          <th>Activity</th>
+        </tr></thead>
+        <tbody id="peersTable"><tr><td colspan="4" style="color:var(--muted);padding:20px 8px">Waiting for data…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Recent Swaps <span>live feed</span></div>
+      <table class="data-table">
+        <thead><tr>
+          <th>Time</th>
+          <th>Peer</th>
+          <th>BTC</th>
+          <th>USDT</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody id="swapsTable"><tr><td colspan="5" style="color:var(--muted);padding:20px 8px">Waiting for data…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Canvas sparkline ─────────────────────────────────────────────────────────
+function drawSparkline(canvasId, buckets, key, color) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  const dpr = window.devicePixelRatio || 1
+  const rect = canvas.getBoundingClientRect()
+  canvas.width  = rect.width  * dpr
+  canvas.height = rect.height * dpr
+  ctx.scale(dpr, dpr)
+  const W = rect.width, H = rect.height
+
+  ctx.clearRect(0, 0, W, H)
+  if (!buckets || buckets.length < 2) return
+
+  const values = buckets.map(b => parseFloat(b[key]) || 0)
+  const max = Math.max(...values, 0.00000001)
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, H)
+  grad.addColorStop(0, color + '55')
+  grad.addColorStop(1, color + '00')
+
+  ctx.beginPath()
+  const step = W / (buckets.length - 1)
+  values.forEach((v, i) => {
+    const x = i * step
+    const y = H - (v / max) * (H - 10) - 5
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+  })
+  // Close fill
+  ctx.lineTo((values.length - 1) * step, H)
+  ctx.lineTo(0, H)
+  ctx.closePath()
+  ctx.fillStyle = grad
+  ctx.fill()
+
+  // Line
+  ctx.beginPath()
+  values.forEach((v, i) => {
+    const x = i * step
+    const y = H - (v / max) * (H - 10) - 5
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+  })
+  ctx.strokeStyle = color
+  ctx.lineWidth = 2
+  ctx.shadowColor = color
+  ctx.shadowBlur = 8
+  ctx.stroke()
+
+  // Grid lines
+  ctx.shadowBlur = 0
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)'
+  ctx.lineWidth = 1
+  for (let i = 1; i < 4; i++) {
+    const y = (H / 4) * i
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+  }
+
+  // Latest value label
+  const lastVal = values[values.length - 1]
+  const label = key === 'volumeBtc'
+    ? lastVal.toFixed(6) + ' BTC'
+    : lastVal + ' swaps'
+  ctx.fillStyle = color
+  ctx.font = '10px Space Mono, monospace'
+  ctx.fillText(label, 8, 16)
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fmtTime(ts) {
+  const d = new Date(ts)
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+function fmtUptime(ms) {
+  const s = Math.floor(ms / 1000)
+  const m = Math.floor(s / 60)
+  const h = Math.floor(m / 60)
+  if (h > 0) return `${h}h ${m % 60}m`
+  if (m > 0) return `${m}m ${s % 60}s`
+  return `${s}s`
+}
+
+function shortPeer(id) {
+  if (!id) return '–'
+  return id.length > 16 ? id.slice(0, 8) + '…' + id.slice(-6) : id
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+let simMode = false
+
+function render(data) {
+  if (!data) return
+
+  // Detect simulation mode on first render
+  if (!simMode && data.totals.rfqRequests > 0) {
+    // Check uptime < 10s — likely sim seeded all at once
+    if (data.uptimeMs < 10_000 && data.totals.rfqRequests > 20) {
+      document.getElementById('simBanner').style.display = 'block'
+      simMode = true
+    }
+  }
+
+  // Uptime
+  document.getElementById('uptime').textContent = 'uptime: ' + fmtUptime(data.uptimeMs)
+
+  // Status dot
+  document.getElementById('statusDot').className = 'dot'
+  document.getElementById('statusText').textContent = 'LIVE'
+
+  // Stat cards
+  document.getElementById('volBtc').textContent         = data.totals.volumeBtc
+  document.getElementById('volUsdt').textContent        = '≈ $' + Number(data.totals.volumeUsdt).toLocaleString(undefined, {minimumFractionDigits:2}) + ' USDT'
+  document.getElementById('swapsSuccess').textContent   = data.totals.swapsSuccess.toLocaleString()
+  document.getElementById('swapsRefund').textContent    = data.totals.swapsRefund + ' refunded'
+  document.getElementById('rfqRequests').textContent    = data.totals.rfqRequests.toLocaleString()
+  document.getElementById('rfqAccepted').textContent    = data.totals.rfqAccepted + ' accepted'
+  document.getElementById('activePeers').textContent    = data.activePeerCount
+  document.getElementById('totalPeers').textContent     = data.totalPeerCount + ' total seen'
+
+  const fillNum = parseFloat(data.totals.rfqFillRate) || 0
+  document.getElementById('fillRate').textContent       = data.totals.rfqFillRate
+  document.getElementById('fillBar').style.width        = Math.min(fillNum, 100) + '%'
+
+  // Charts
+  drawSparkline('volumeChart', data.buckets, 'volumeBtc', '#00e5ff')
+  drawSparkline('swapChart',   data.buckets, 'swaps',     '#00ff88')
+
+  // Top peers table
+  const maxSwaps = data.topPeers[0]?.swaps || 1
+  const peersHtml = data.topPeers.length
+    ? data.topPeers.map(p => `
+      <tr>
+        <td><div class="peer-id">${shortPeer(p.id)}</div></td>
+        <td>${p.swaps}</td>
+        <td>${p.rfqs}</td>
+        <td><div style="display:flex;align-items:center;gap:6px;">
+          <div class="peer-bar-wrap"><div class="peer-bar" style="width:${Math.round((p.swaps/maxSwaps)*100)}%"></div></div>
+        </div></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" style="color:var(--muted);padding:20px 8px">No peers yet…</td></tr>'
+  document.getElementById('peersTable').innerHTML = peersHtml
+
+  // Recent swaps table
+  const swapsHtml = data.recentSwaps.length
+    ? data.recentSwaps.slice(0, 20).map(s => `
+      <tr>
+        <td class="ts">${fmtTime(s.ts)}</td>
+        <td><div class="peer-id">${shortPeer(s.peerId)}</div></td>
+        <td>${parseFloat(s.amountSats) > 0 ? (parseInt(s.amountSats)/1e8).toFixed(6) : '–'}</td>
+        <td>${parseFloat(s.amountUsdt) > 0 ? '$'+Number(s.amountUsdt).toFixed(2) : '–'}</td>
+        <td><span class="badge success">SETTLED</span></td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" style="color:var(--muted);padding:20px 8px">Waiting for swaps…</td></tr>'
+  document.getElementById('swapsTable').innerHTML = swapsHtml
+}
+
+// ─── SSE connection ───────────────────────────────────────────────────────────
+function connect() {
+  const es = new EventSource('/events')
+
+  es.onmessage = (e) => {
+    try { render(JSON.parse(e.data)) } catch {}
+  }
+
+  es.onerror = () => {
+    document.getElementById('statusDot').className = 'dot offline'
+    document.getElementById('statusText').textContent = 'RECONNECTING'
+    es.close()
+    setTimeout(connect, 3000)
+  }
+}
+
+connect()
+
+// Redraw charts on resize
+window.addEventListener('resize', () => {
+  // Re-fetch and redraw
+  fetch('/api/snapshot').then(r => r.json()).then(render).catch(() => {})
+})
+</script>
+</body>
+</html>
