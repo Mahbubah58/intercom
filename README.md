@@ -117,7 +117,6 @@ IntercomSwap: [Trac-Systems/intercom-swap](https://github.com/TracSystems/interc
 
 **trac1fdy2nkvwppqz9qh037lgxyezxfja6teyalqamuepg6aw4er8lpmqun04gh**
 
-*(Replace this with your Trac wallet address for the competition reward payout)*
 
 ---
 
